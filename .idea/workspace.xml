@@ -4,11 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="780ddf4c-5b44-4bf4-8ab0-7ef866a3bf48" name="Changes" comment="первичный поворот 4">
-      <change afterPath="$PROJECT_DIR$/manual.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/uluch.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-    </list>
+    <list default="true" id="780ddf4c-5b44-4bf4-8ab0-7ef866a3bf48" name="Changes" comment="первичный поворот 14" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -23,6 +19,20 @@
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
+  "lastFilter": {
+    "state": "OPEN",
+    "assignee": "asbcorp24"
+  }
+}]]></component>
+  <component name="GithubPullRequestsUISettings">
+    <option name="selectedUrlAndAccountId">
+      <UrlAndAccount>
+        <option name="accountId" value="7c631a3c-6a10-487a-9e0a-a886df9f4a25" />
+        <option name="url" value="https://github.com/asbcorp24/povorotnik.git" />
+      </UrlAndAccount>
+    </option>
   </component>
   <component name="ProjectColorInfo"><![CDATA[{
   "associatedIndex": 5
@@ -168,7 +178,23 @@
       <option name="project" value="LOCAL" />
       <updated>1737033100229</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="первичный поворот 12">
+      <option name="closed" value="true" />
+      <created>1737035434777</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1737035434777</updated>
+    </task>
+    <task id="LOCAL-00006" summary="первичный поворот 14">
+      <option name="closed" value="true" />
+      <created>1737035615380</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1737035615380</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="VcsManagerConfiguration">
@@ -177,7 +203,9 @@
     <MESSAGE value="первичный поворот 2" />
     <MESSAGE value="первичный поворот 3" />
     <MESSAGE value="первичный поворот 4" />
-    <option name="LAST_COMMIT_MESSAGE" value="первичный поворот 4" />
+    <MESSAGE value="первичный поворот 12" />
+    <MESSAGE value="первичный поворот 14" />
+    <option name="LAST_COMMIT_MESSAGE" value="первичный поворот 14" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
