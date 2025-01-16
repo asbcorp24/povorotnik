@@ -32,37 +32,28 @@ class ImageAlignerApp:
         self.rotation_slider = Scale(self.main_frame, from_=0, to=360, orient=HORIZONTAL, command=self.rotate_original_image, length=400)
         self.rotation_slider.pack(pady=5)
 
-        # Canvas for image display
-        self.image_canvas = Canvas(self.main_frame, width=600, height=400, bg="white")
-        self.image_canvas.pack(pady=10)
-
-        # Scrollbars for canvas
-        self.scroll_x = Scrollbar(self.main_frame, orient="horizontal", command=self.image_canvas.xview)
-        self.scroll_x.pack(side="bottom", fill="x")
-
-        self.scroll_y = Scrollbar(self.main_frame, orient="vertical", command=self.image_canvas.yview)
-        self.scroll_y.pack(side="right", fill="y")
-
-        self.image_canvas.configure(xscrollcommand=self.scroll_x.set, yscrollcommand=self.scroll_y.set)
-
         self.original_image = None
         self.original_image_rotated = None
         self.target_image = None
         self.result_image = None
+        self.original_window = None
+        self.target_window = None
+        self.result_window = None
+        self.matches_window = None
 
     def load_original_image(self):
         file_path = filedialog.askopenfilename()
         if file_path:
             self.original_image = cv2.imread(file_path)
             self.original_image_rotated = self.original_image.copy()
-            self.display_image(self.original_image_rotated, "Original Image")
+            self.display_image(self.original_image_rotated, "Original Image", "original_window")
             self.check_ready()
 
     def load_target_image(self):
         file_path = filedialog.askopenfilename()
         if file_path:
             self.target_image = cv2.imread(file_path)
-            self.display_image(self.target_image, "Target Image")
+            self.display_image(self.target_image, "Target Image", "target_window")
             self.check_ready()
 
     def check_ready(self):
@@ -77,9 +68,10 @@ class ImageAlignerApp:
 
             rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
             self.original_image_rotated = cv2.warpAffine(self.original_image, rotation_matrix, (width, height))
-            self.display_image(self.original_image_rotated, "Rotated Original Image")
+            self.display_image(self.original_image_rotated, "Rotated Original Image", "original_window")
 
-    def display_image(self, img, title):
+    def display_image(self, img, title, window_attr):
+        # Масштабируем изображение до ширины 600 пикселей с сохранением пропорций
         max_width = 600
         height, width = img.shape[:2]
         scale = max_width / width
@@ -87,22 +79,32 @@ class ImageAlignerApp:
         new_height = int(height * scale)
         resized_img = cv2.resize(img, (new_width, new_height))
 
+        # Преобразуем изображение для отображения в Tkinter
         img_rgb = cv2.cvtColor(resized_img, cv2.COLOR_BGR2RGB)
         img_pil = Image.fromarray(img_rgb)
         img_tk = ImageTk.PhotoImage(img_pil)
 
-        self.image_canvas.delete("all")
-        self.image_canvas.create_image(0, 0, anchor="nw", image=img_tk)
-        self.image_canvas.image = img_tk
-        self.image_canvas.config(scrollregion=self.image_canvas.bbox("all"))
+        # Проверяем существование окна
+        window = getattr(self, window_attr, None)
+        if window and window.winfo_exists():
+            # Если окно уже существует, обновляем содержимое
+            canvas = getattr(self, f"{window_attr}_canvas")
+            canvas.delete("all")
+            canvas.create_image(0, 0, anchor="nw", image=img_tk)
+            canvas.image = img_tk
+        else:
+            # Если окна нет, создаем его
+            window = Toplevel(self.master)
+            window.title(title)
+            setattr(self, window_attr, window)
 
-        image_window = Toplevel(self.master)
-        image_window.title(title)
+            canvas = Canvas(window, width=new_width, height=new_height, bg="white")
+            canvas.pack()
+            canvas.create_image(0, 0, anchor="nw", image=img_tk)
+            setattr(self, f"{window_attr}_canvas", canvas)
 
-        canvas = Canvas(image_window, width=new_width, height=new_height, bg="white")
-        canvas.pack()
-        canvas.create_image(0, 0, anchor="nw", image=img_tk)
-        canvas.image = img_tk
+            # Сохраняем изображение, чтобы предотвратить его удаление
+            canvas.image = img_tk
 
     def align_images(self):
         gray_original = cv2.cvtColor(self.original_image_rotated, cv2.COLOR_BGR2GRAY)
@@ -128,14 +130,14 @@ class ImageAlignerApp:
             singlePointColor=(255, 0, 0)
         )
 
-        self.display_image(matched_image, "Keypoint Matches")
+        self.display_image(matched_image, "Keypoint Matches", "matches_window")
 
         matrix, mask = cv2.findHomography(points2, points1, cv2.RANSAC, 5.0)
 
         height, width = self.original_image_rotated.shape[:2]
         self.result_image = cv2.warpPerspective(self.target_image, matrix, (width, height))
 
-        self.display_image(self.result_image, "Aligned Result")
+        self.display_image(self.result_image, "Aligned Result", "result_window")
 
 if __name__ == "__main__":
     root = Tk()
