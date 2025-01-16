@@ -51,14 +51,14 @@ class ImageAlignerApp:
         if file_path:
             self.original_image, _ = self.resize_for_processing(cv2.imread(file_path))
             self.original_image_rotated = self.original_image.copy()
-            self.display_image(self.original_image_rotated, "Original Image", "original_window")
+            self.display_image(self.original_image_rotated, "Оригинал", "original_window")
             self.check_ready()
 
     def load_target_image(self):
         file_path = filedialog.askopenfilename()
         if file_path:
             self.target_image, _ = self.resize_for_processing(cv2.imread(file_path))
-            self.display_image(self.target_image, "Target Image", "target_window")
+            self.display_image(self.target_image, "че вращаем", "target_window")
             self.check_ready()
 
     def check_ready(self):
@@ -81,7 +81,7 @@ class ImageAlignerApp:
             rotation_matrix[1, 2] += (bound_h / 2) - center[1]
 
             self.original_image_rotated = cv2.warpAffine(self.original_image, rotation_matrix, (bound_w, bound_h))
-            self.display_image(self.original_image_rotated, "Rotated Original Image", "original_window")
+            self.display_image(self.original_image_rotated, "Повернутое", "original_window")
 
     def display_image(self, img, title, window_attr):
         max_width = 600
@@ -142,13 +142,13 @@ class ImageAlignerApp:
         self.display_image(self.result_image, "поревнутый резулсь", "result_window")
 
         comparison_image = self.side_by_side(self.original_image_rotated, self.result_image)
-        self.display_image(comparison_image, "Comparison", "comparison_window")
+        self.display_image(comparison_image, "Сравнивание", "comparison_window")
 
         end_time = time.time()
-        print(f"Alignment completed in {end_time - start_time:.2f} seconds.")
+        print(f"Все сделал за {end_time - start_time:.2f} секунды.")
 
     def save_result(self):
-        file_path = filedialog.asksaveasfilename(defaultextension=".jpg", filetypes=[("JPEG files", "*.jpg"), ("PNG files", "*.png")])
+        file_path = filedialog.asksaveasfilename(defaultextension=".jpg", filetypes=[("JPEG ", "*.jpg"), ("PNG ", "*.png")])
         if file_path:
             cv2.imwrite(file_path, self.result_image)
 
