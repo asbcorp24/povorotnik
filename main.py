@@ -6,27 +6,27 @@ from PIL import Image, ImageTk
 class ImageAlignerApp:
     def __init__(self, master):
         self.master = master
-        self.master.title("Advanced Image Aligner")
+        self.master.title("поворотчик")
 
         # Main frame setup
         self.main_frame = Frame(master)
         self.main_frame.pack(fill="both", expand=True)
 
-        self.label = Label(self.main_frame, text="Choose images to align", font=("Arial", 16))
+        self.label = Label(self.main_frame, text="Выберите рисунок", font=("Arial", 16))
         self.label.pack(pady=10)
 
         # Buttons for loading images
-        self.choose_original_button = Button(self.main_frame, text="Choose Original Image", command=self.load_original_image, bg="lightblue", font=("Arial", 12))
+        self.choose_original_button = Button(self.main_frame, text="Выберите оригинал", command=self.load_original_image, bg="lightblue", font=("Arial", 12))
         self.choose_original_button.pack(pady=5)
 
-        self.choose_target_button = Button(self.main_frame, text="Choose Target Image", command=self.load_target_image, bg="lightgreen", font=("Arial", 12))
+        self.choose_target_button = Button(self.main_frame, text="Выберите что вращаем", command=self.load_target_image, bg="lightgreen", font=("Arial", 12))
         self.choose_target_button.pack(pady=5)
 
-        self.align_button = Button(self.main_frame, text="Align Images", command=self.align_images, state="disabled", bg="orange", font=("Arial", 12))
+        self.align_button = Button(self.main_frame, text="Поворот", command=self.align_images, state="disabled", bg="orange", font=("Arial", 12))
         self.align_button.pack(pady=10)
 
         # Rotation slider
-        self.rotation_label = Label(self.main_frame, text="Rotate Original Image:", font=("Arial", 12))
+        self.rotation_label = Label(self.main_frame, text="ПОвернутое:", font=("Arial", 12))
         self.rotation_label.pack(pady=5)
 
         self.rotation_slider = Scale(self.main_frame, from_=0, to=360, orient=HORIZONTAL, command=self.rotate_original_image, length=400)
@@ -46,14 +46,14 @@ class ImageAlignerApp:
         if file_path:
             self.original_image = cv2.imread(file_path)
             self.original_image_rotated = self.original_image.copy()
-            self.display_image(self.original_image_rotated, "Original Image", "original_window")
+            self.display_image(self.original_image_rotated, "Оригинал ", "original_window")
             self.check_ready()
 
     def load_target_image(self):
         file_path = filedialog.askopenfilename()
         if file_path:
             self.target_image = cv2.imread(file_path)
-            self.display_image(self.target_image, "Target Image", "target_window")
+            self.display_image(self.target_image, "Что вращаем", "target_window")
             self.check_ready()
 
     def check_ready(self):
@@ -68,7 +68,7 @@ class ImageAlignerApp:
 
             rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
             self.original_image_rotated = cv2.warpAffine(self.original_image, rotation_matrix, (width, height))
-            self.display_image(self.original_image_rotated, "Rotated Original Image", "original_window")
+            self.display_image(self.original_image_rotated, "повернутый Оригинал изображения", "original_window")
 
     def display_image(self, img, title, window_attr):
         # Масштабируем изображение до ширины 600 пикселей с сохранением пропорций
@@ -110,18 +110,43 @@ class ImageAlignerApp:
         gray_original = cv2.cvtColor(self.original_image_rotated, cv2.COLOR_BGR2GRAY)
         gray_target = cv2.cvtColor(self.target_image, cv2.COLOR_BGR2GRAY)
 
+        # Используем ORB для обнаружения ключевых точек
         orb = cv2.ORB_create()
         keypoints1, descriptors1 = orb.detectAndCompute(gray_original, None)
         keypoints2, descriptors2 = orb.detectAndCompute(gray_target, None)
 
+        # Сопоставляем ключевые точки
         bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
         matches = bf.match(descriptors1, descriptors2)
         matches = sorted(matches, key=lambda x: x.distance)
         best_matches = matches[:50]
 
+        # Координаты совпадающих точек
         points1 = np.float32([keypoints1[m.queryIdx].pt for m in best_matches]).reshape(-1, 1, 2)
         points2 = np.float32([keypoints2[m.trainIdx].pt for m in best_matches]).reshape(-1, 1, 2)
 
+        # Вычисляем начальную гомографию
+        matrix, mask = cv2.findHomography(points2, points1, cv2.RANSAC, 5.0)
+
+        # Итеративное уточнение гомографии
+        for i in range(10):  # Максимум 10 итераций
+            transformed_points = cv2.perspectiveTransform(points2, matrix)
+            differences = points1 - transformed_points
+            distances = np.linalg.norm(differences, axis=2).flatten()
+
+            # Определяем инлайнеры (точки, которые хорошо соответствуют)
+            inlier_mask = distances < 5.0
+            inlier_points1 = points1[inlier_mask]
+            inlier_points2 = points2[inlier_mask]
+
+            # Прекращаем уточнение, если осталось слишком мало точек
+            if len(inlier_points1) < 10:
+                break
+
+            # Обновляем гомографию
+            matrix, _ = cv2.findHomography(inlier_points2, inlier_points1, cv2.RANSAC, 5.0)
+
+        # Рисуем соответствия
         matched_image = cv2.drawMatches(
             self.original_image_rotated, keypoints1,
             self.target_image, keypoints2,
@@ -130,14 +155,14 @@ class ImageAlignerApp:
             singlePointColor=(255, 0, 0)
         )
 
-        self.display_image(matched_image, "Keypoint Matches", "matches_window")
+        self.display_image(matched_image, "Точки поиска", "matches_window")
 
-        matrix, mask = cv2.findHomography(points2, points1, cv2.RANSAC, 5.0)
-
+        # Применяем уточненную гомографию
         height, width = self.original_image_rotated.shape[:2]
         self.result_image = cv2.warpPerspective(self.target_image, matrix, (width, height))
 
-        self.display_image(self.result_image, "Aligned Result", "result_window")
+        self.display_image(self.result_image, "Результат поворота", "result_window")
+
 
 if __name__ == "__main__":
     root = Tk()
