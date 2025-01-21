@@ -1,0 +1,15 @@
+altgraph==0.17.4
+imageio==2.37.0
+lazy_loader==0.4
+networkx==3.4.2
+numpy==2.2.1
+opencv-python==4.10.0.84
+packaging==24.2
+pefile==2023.2.7
+pillow==11.1.0
+pyinstaller==6.11.1
+pyinstaller-hooks-contrib==2025.0
+pywin32-ctypes==0.2.3
+scikit-image==0.25.0
+scipy==1.15.1
+tifffile==2025.1.10

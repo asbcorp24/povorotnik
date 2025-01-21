@@ -3,7 +3,13 @@ import numpy as np
 import time
 from tkinter import Tk, Label, Button, filedialog, Toplevel, Frame, Canvas, Scale, HORIZONTAL, StringVar, OptionMenu
 from PIL import Image, ImageTk
-
+from skimage import segmentation, measure
+from skimage import img_as_float
+from skimage.draw import circle_perimeter
+from skimage.feature import canny
+from skimage.transform import resize
+from skimage.measure import label, regionprops  # Добавили импорт функции label+
+from skimage.metrics import structural_similarity as ssim
 class ImageAlignerApp:
     def __init__(self, master):
         self.master = master
@@ -28,7 +34,30 @@ class ImageAlignerApp:
 
         self.compare_button = Button(self.main_frame, text="Compare Images", command=self.compare_images, bg="yellow", font=("Arial", 12), state="disabled")
         self.compare_button.pack(pady=5)
+        # New button for improved comparison
+        self.improved_compare_button = Button(self.main_frame, text="Improved Compare",
+                                              command=self.improved_compare_images, bg="purple", font=("Arial", 12),
+                                             )
+        # New button for improved comparison
+        self.roi_compare_button = Button(self.main_frame, text="Compare Within ROI", command=self.compare_within_roi,
+                                         bg="purple", font=("Arial", 12))
 
+        self.roi_compare_button = Button(self.main_frame, text="Compare Within ROI2", command=self.compare_within_roi2,
+                                         bg="purple", font=("Arial", 12) )
+        self.ssim_button = Button(self.main_frame, text="Compare with SSIM", command=self.compare_with_ssim,
+                                  bg="purple", font=("Arial", 12) )
+        self.ssim_button.pack(pady=5)
+
+        self.active_contour_button = Button(self.main_frame, text="Compare with Active Contour",
+                                            command=self.compare_with_active_contour, bg="purple", font=("Arial", 12),
+                                             )
+        self.active_contour_button.pack(pady=5)
+
+        self.roi_compare_button.pack(pady=5)
+
+        self.roi_compare_button.pack(pady=5)
+
+        self.improved_compare_button.pack(pady=5)
         self.save_button = Button(self.main_frame, text="Save Result", command=self.save_result, bg="lightgreen", font=("Arial", 12))
         self.save_button.pack(pady=5)
 
@@ -57,6 +86,220 @@ class ImageAlignerApp:
         self.result_window = None
         self.matches_window = None
         self.comparison_window = None
+    def compare_with_ssim(self):
+        if self.original_image_rotated is None or self.result_image is None:
+            print("Images are not ready for comparison.")
+            return
+
+        # Преобразуем изображения в серое
+        original_gray = cv2.cvtColor(self.original_image_rotated, cv2.COLOR_BGR2GRAY)
+        modified_gray = cv2.cvtColor(self.result_image, cv2.COLOR_BGR2GRAY)
+
+        # Вычисляем SSIM между изображениями
+        ssim_value, ssim_map = ssim(original_gray, modified_gray, full=True)
+
+        # Отображаем карту различий
+        ssim_map = (ssim_map * 255).astype(np.uint8)
+        highlighted_image = cv2.applyColorMap(ssim_map, cv2.COLORMAP_JET)
+
+        self.display_image(highlighted_image, "SSIM Difference Map", "ssim_comparison_window")
+
+
+    def preprocess_image(self, image):
+        # Преобразуем в серый и применяем сглаживание
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+        return blurred
+
+    def active_contour(self, image):
+        # Преобразуем изображение в плавающие значения
+        image_float = img_as_float(image)
+
+        # Применение Canny edge detector для выделения краев
+        edges = canny(image_float)
+
+        # Автоматическое нахождение области интереса через контуры
+        labeled_image = label(edges)  # Обнаруживаем контуры
+        regions = regionprops(labeled_image)  # Получаем регионы объектов
+
+        # Используем первый регион для инициализации активного контура
+        if regions:
+            minr, minc, maxr, maxc = regions[0].bbox
+            init = np.array([[minc, minr], [maxc, minr], [maxc, maxr], [minc, maxr]])
+            init = np.reshape(init, (-1, 2))  # Преобразуем в нужный формат для активного контура
+        else:
+            # Если нет обнаруженных объектов, инициализируем контур вручную
+            init = np.array([[[50, 50], [250, 50], [250, 250], [50, 250]]])  # Прямоугольник
+            init = np.reshape(init, (-1, 2))  # Преобразуем в нужный формат
+
+        # Применение метода активных контуров
+        active_contour_result = segmentation.active_contour(edges, init, alpha=0.015, beta=10, gamma=0.001,
+                                                            max_num_iter=250)
+
+        return active_contour_result
+
+    def compare_with_active_contour(self):
+        if self.original_image_rotated is None or self.result_image is None:
+            print("Images are not ready for comparison.")
+            return
+
+        # Преобразуем изображения в серое
+        original_processed = self.preprocess_image(self.original_image_rotated)
+        modified_processed = self.preprocess_image(self.result_image)
+
+        # Применяем активные контуры
+        contour_original = self.active_contour(original_processed)
+        contour_modified = self.active_contour(modified_processed)
+
+        # Отображаем результат
+        cv2.polylines(self.original_image_rotated, [contour_original.astype(np.int32)], isClosed=True,
+                      color=(0, 255, 0), thickness=2)
+        cv2.polylines(self.result_image, [contour_modified.astype(np.int32)], isClosed=True, color=(0, 255, 0),
+                      thickness=2)
+
+        # Показываем изображения с выделенными контурами
+        self.display_image(self.original_image_rotated, "Original with Active Contour", "original_with_contour_window")
+        self.display_image(self.result_image, "Modified with Active Contour", "modified_with_contour_window")
+
+    def compare_within_roi2(self):
+        if self.original_image_rotated is None or self.result_image is None:
+            print("Images are not ready for comparison.")
+            return
+
+        # Преобразуем изображения в серый формат
+        original_image_gray = cv2.cvtColor(self.original_image_rotated, cv2.COLOR_BGR2GRAY)
+        result_image_gray = cv2.cvtColor(self.result_image, cv2.COLOR_BGR2GRAY)
+
+        # Применяем SIFT для выделения ключевых точек
+        sift = cv2.SIFT_create()
+        keypoints1, _ = sift.detectAndCompute(original_image_gray, None)
+        keypoints2, _ = sift.detectAndCompute(result_image_gray, None)
+
+        # Создаем маски для выделения ROI (регионов интереса) вокруг ключевых точек
+        mask1 = np.zeros_like(original_image_gray)
+        mask2 = np.zeros_like(result_image_gray)
+
+        for kp in keypoints1:
+            x, y = kp.pt
+            cv2.circle(mask1, (int(x), int(y)), 50, 255, -1)  # Радиус вокруг ключевых точек
+        for kp in keypoints2:
+            x, y = kp.pt
+            cv2.circle(mask2, (int(x), int(y)), 50, 255, -1)
+
+        # Применяем маски для выделения только интересующих областей
+        roi_original = cv2.bitwise_and(original_image_gray, original_image_gray, mask=mask1)
+        roi_result = cv2.bitwise_and(result_image_gray, result_image_gray, mask=mask2)
+
+        # Вычисление абсолютной разницы и выделение различий
+        diff = cv2.absdiff(roi_original, roi_result)
+        _, threshold_diff = cv2.threshold(diff, 50, 255, cv2.THRESH_BINARY)
+
+        # Морфологическое открытие для удаления мелких шумов
+        kernel = np.ones((5, 5), np.uint8)
+        threshold_diff = cv2.morphologyEx(threshold_diff, cv2.MORPH_OPEN, kernel)
+
+        contours, _ = cv2.findContours(threshold_diff, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        highlighted_result = self.result_image.copy()
+        for i, contour in enumerate(contours):
+            x, y, w, h = cv2.boundingRect(contour)
+            cv2.rectangle(highlighted_result, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            cv2.putText(highlighted_result, str(i + 1), (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+        self.display_image(highlighted_result, "Differences Inside ROI", "roi_comparison_window")
+
+    def compare_within_roi(self):
+        if self.original_image_rotated is None or self.result_image is None:
+            print("Images are not ready for comparison.")
+            return
+
+        # Преобразуем изображения в серый формат
+        original_image_gray = cv2.cvtColor(self.original_image_rotated, cv2.COLOR_BGR2GRAY)
+        result_image_gray = cv2.cvtColor(self.result_image, cv2.COLOR_BGR2GRAY)
+
+        # Применяем SIFT для выделения ключевых точек
+        sift = cv2.SIFT_create()
+        keypoints1, descriptors1 = sift.detectAndCompute(original_image_gray, None)
+        keypoints2, descriptors2 = sift.detectAndCompute(result_image_gray, None)
+
+        # Создаем маски для выделения ROI (регионов интереса) вокруг ключевых точек
+        mask1 = np.zeros_like(original_image_gray)
+        mask2 = np.zeros_like(result_image_gray)
+        for kp in keypoints1:
+            x, y = kp.pt
+            cv2.circle(mask1, (int(x), int(y)), 50, 255, -1)  # Радиус вокруг ключевых точек
+        for kp in keypoints2:
+            x, y = kp.pt
+            cv2.circle(mask2, (int(x), int(y)), 50, 255, -1)
+
+        # Применяем маски для выделения только интересующих областей
+        roi_original = cv2.bitwise_and(original_image_gray, original_image_gray, mask=mask1)
+        roi_result = cv2.bitwise_and(result_image_gray, result_image_gray, mask=mask2)
+
+        # Вычисление абсолютной разницы внутри ROI
+        diff = cv2.absdiff(roi_original, roi_result)
+        _, threshold_diff = cv2.threshold(diff, 50, 255, cv2.THRESH_BINARY)
+
+        contours, _ = cv2.findContours(threshold_diff, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        # Выделяем различия внутри ROI
+        highlighted_result = self.result_image.copy()
+        for i, contour in enumerate(contours):
+            x, y, w, h = cv2.boundingRect(contour)
+            cv2.rectangle(highlighted_result, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            cv2.putText(highlighted_result, str(i + 1), (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+        self.display_image(highlighted_result, "Differences Inside ROI", "roi_comparison_window")
+
+    def improved_compare_images(self):
+        if self.original_image_rotated is None or self.result_image is None:
+            print("Images are not ready for comparison.")
+            return
+
+        # Приведение изображений к одинаковому размеру
+        height, width = self.result_image.shape[:2]
+        resized_original_image = cv2.resize(self.original_image_rotated, (width, height))
+
+        # Преобразование в оттенки серого
+        original_image = cv2.cvtColor(resized_original_image, cv2.COLOR_BGR2GRAY)
+        result_image = cv2.cvtColor(self.result_image, cv2.COLOR_BGR2GRAY)
+
+        # SIFT for feature matching
+        sift = cv2.SIFT_create()
+        keypoints1, descriptors1 = sift.detectAndCompute(original_image, None)
+        keypoints2, descriptors2 = sift.detectAndCompute(result_image, None)
+
+        flann = cv2.FlannBasedMatcher(dict(algorithm=1, trees=10), dict(checks=50))
+        matches = flann.knnMatch(descriptors1, descriptors2, k=2)
+
+        good_matches = [m for m, n in matches if m.distance < 0.75 * n.distance]
+
+        # Draw matches
+        matched_image = cv2.drawMatches(self.original_image_rotated, keypoints1, self.result_image, keypoints2,
+                                        good_matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+
+        self.display_image(matched_image, "Improved Keypoint Matches", "improved_matches_window")
+
+        # Compute absolute difference and highlight it
+        diff = cv2.absdiff(resized_original_image, self.result_image)
+
+        # Ensure images have the same number of channels
+        if len(diff.shape) == 3 and diff.shape[2] == 3:  # If 3 channels (BGR)
+            diff_gray = cv2.cvtColor(diff, cv2.COLOR_BGR2GRAY)
+        else:
+            diff_gray = diff
+
+        _, threshold_diff = cv2.threshold(diff_gray, 50, 255, cv2.THRESH_BINARY)
+
+        contours, _ = cv2.findContours(threshold_diff, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        highlighted_result = self.result_image.copy()
+        for i, contour in enumerate(contours):
+            x, y, w, h = cv2.boundingRect(contour)
+            cv2.rectangle(highlighted_result, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            cv2.putText(highlighted_result, str(i + 1), (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+        self.display_image(highlighted_result, "Improved Differences Highlighted", "improved_comparison_window")
 
     def load_original_image(self):
         file_path = filedialog.askopenfilename()
